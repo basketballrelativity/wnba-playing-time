@@ -40,7 +40,7 @@ def main(game_id: int) -> pd.DataFrame:
 
     # Ingest data
     pbp_df = data.ingest_pbp_data(game_id)
-    box_score_df = data.ingest_box_score_data(game_id)
+    box_score_df = data.ingest_boxscore_data(game_id)
     game_df = data.ingest_game_data(game_id)
 
     # Get rosters
