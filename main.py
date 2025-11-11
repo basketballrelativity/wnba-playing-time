@@ -8,6 +8,7 @@ from typing import List, Tuple
 import pandas as pd
 
 import data
+import utils
 
 def get_rosters(home_team_id: int, visitor_team_id: int, box_score_df: pd.DataFrame) -> Tuple[List[int], List[int]]:
     """
@@ -43,6 +44,9 @@ def main(game_id: int) -> pd.DataFrame:
     box_score_df = data.ingest_boxscore_data(game_id)
     game_df = data.ingest_game_data(game_id)
 
+    home_id = game_df['home_team_id'].values[0]
+    visitor_id = game_df['visitor_team_id'].values[0]
+
     # Get rosters
     home_roster, visitor_roster = get_rosters(
         game_df['home_team_id'].values[0],
@@ -50,8 +54,21 @@ def main(game_id: int) -> pd.DataFrame:
         box_score_df
     )
 
-    return None
+    # Process play-by-play data
+    sub_df, pbp_df = utils.process_pbp_data(
+        pbp_df,
+        home_roster,
+        visitor_roster,
+        home_id,
+        visitor_id
+    )
 
+    # Assign players on the court
+    player_on_court_df = utils.assign_players_on_court(
+        sub_df,
+        pbp_df,
+        home_id,
+        visitor_id
+    )
 
-if __name__ == "__main__":
-    main(None)
+    return player_on_court_df

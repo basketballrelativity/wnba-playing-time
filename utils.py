@@ -81,13 +81,11 @@ def process_pbp_data(pbp_df: pd.DataFrame, home_roster: pd.DataFrame, visitor_ro
                     home_on_court.remove(row["player1_id"])
                 if row["player2_id"] not in home_on_court:
                     home_on_court.append(row["player2_id"])
-                print(f"Subbing home: {row['player2_id']} in for {row['player1_id']}")
             else:
                 if row["player1_id"] in visitor_on_court:
                     visitor_on_court.remove(row["player1_id"])
                 if row["player2_id"] not in visitor_on_court:
                     visitor_on_court.append(row["player2_id"])
-                print(f"Subbing visitor: {row['player2_id']} in for {row['player1_id']}")
 
             # Update playing time bank for player 1
             ## If we're missing a sub-in time, assume that the player has been in since the start of the period
@@ -116,7 +114,7 @@ def process_pbp_data(pbp_df: pd.DataFrame, home_roster: pd.DataFrame, visitor_ro
             period += 1
             home_on_court = []
             visitor_on_court = []
-        elif row["eventmsgtype"] <= 5:
+        elif row["eventmsgtype"] <= 10:
             # For other events involving on-court action, ensure that all players involved are marked as on-court
             for player_id in [row["player1_id"], row["player2_id"], row["player3_id"]]:
                 if pd.isnull(player_id):
