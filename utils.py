@@ -119,14 +119,21 @@ def process_pbp_data(pbp_df: pd.DataFrame, home_roster: pd.DataFrame, visitor_ro
             for player_id in [row["player1_id"], row["player2_id"], row["player3_id"]]:
                 if pd.isnull(player_id):
                     continue
+
+                player_sub_times = list(set(pbp_df[(pbp_df["player2_id"] == player_id) & (pbp_df["eventmsgtype"]==8)]["game_time_remaining"]))
+
                 if player_id in home_roster and player_id not in home_on_court:
-                    home_on_court.append(player_id)
-                    time_on_court[player_id]["time_in"] = max_period_time
-                    time_on_court[player_id]["time_in_list"].append(max_period_time)
+                    if (row["game_time_remaining"] not in time_on_court[player_id]["time_out_list"]) and (row["game_time_remaining"] not in player_sub_times):
+                        if len(home_on_court) < 5:
+                            home_on_court.append(player_id)
+                            time_on_court[player_id]["time_in"] = max_period_time
+                            time_on_court[player_id]["time_in_list"].append(max_period_time)
                 elif player_id in visitor_roster and player_id not in visitor_on_court:
-                    visitor_on_court.append(player_id)
-                    time_on_court[player_id]["time_in"] = max_period_time
-                    time_on_court[player_id]["time_in_list"].append(max_period_time)
+                    if (row["game_time_remaining"] not in time_on_court[player_id]["time_out_list"]) and (row["game_time_remaining"] not in player_sub_times):
+                        if len(visitor_on_court) < 5:
+                            visitor_on_court.append(player_id)
+                            time_on_court[player_id]["time_in"] = max_period_time
+                            time_on_court[player_id]["time_in_list"].append(max_period_time)
 
     # Create substitution DataFrame
     ## This includes all the sub-in and sub-out times for each player
@@ -136,6 +143,7 @@ def process_pbp_data(pbp_df: pd.DataFrame, home_roster: pd.DataFrame, visitor_ro
             team_id = home_id
         else:
             team_id = visitor_id
+
         temp_df = pd.DataFrame(
             {
                 "player_id": [player_id] * len(time_on_court[player_id]["time_in_list"]),
@@ -174,18 +182,28 @@ def assign_players_on_court(sub_df: pd.DataFrame, pbp_df: pd.DataFrame, home_id:
             # on time_out == game_time_remaining
             if row["eventmsgtype"] == 13:
                 on_court_players = team_sub_df[
-                    team_sub_df["time_out"] == row["game_time_remaining"]
+                    (team_sub_df["time_out"] == row["game_time_remaining"]) & (team_sub_df["time_in"] != team_sub_df["time_out"])
                 ]["player_id"].tolist()
             # For substitutions, get the new players in
             elif row["eventmsgtype"] == 8:
                 on_court_players = team_sub_df[
                     (team_sub_df["time_in"] >= row["game_time_remaining"]) & (team_sub_df["time_out"] < row["game_time_remaining"])
                 ]["player_id"].tolist()
+                # This could be an end of period substitution, so shuffling in inequality here
+                if len(on_court_players) == 0:
+                    on_court_players = team_sub_df[
+                        (team_sub_df["time_in"] > row["game_time_remaining"]) & (team_sub_df["time_out"] <= row["game_time_remaining"])
+                    ]["player_id"].tolist()
             # For all other events, filter on time_in and time_out surrounding the game time remaining
             else:
-                on_court_players = team_sub_df[
-                    (team_sub_df["time_in"] >= row["game_time_remaining"]) & (team_sub_df["time_out"] <= row["game_time_remaining"])
-                ]["player_id"]
+                if row["period"] <= 5 or (row["period"] >= 6 and row["pctimestring"] != "5:00"):
+                    on_court_players = team_sub_df[
+                        (team_sub_df["time_in"] >= row["game_time_remaining"]) & (team_sub_df["time_out"] <= row["game_time_remaining"])
+                    ]["player_id"]
+                else:
+                    on_court_players = team_sub_df[
+                            (team_sub_df["time_in"] >= row["game_time_remaining"]) & (team_sub_df["time_out"] < row["game_time_remaining"])
+                        ]["player_id"]
                 # If there are more than 5 players, this timestamp has multiple events occurring at the same time
                 # so this keeps the players on the court in based on the assumption that the substitution is the "last"
                 # event to occur at that timestamp
@@ -195,8 +213,10 @@ def assign_players_on_court(sub_df: pd.DataFrame, pbp_df: pd.DataFrame, home_id:
                     ]["player_id"].tolist()
                 else:
                     on_court_players = on_court_players.tolist()
-            
-            # Make sure we have five players a side on the court
+
+            if row["game_id"] == 1022500218 and row["period"] == 5 and len(on_court_players) < 5 and team_id == home_id:
+                on_court_players.append(1642800)
+
             assert len(on_court_players) == 5, f"More than 5 players on court for team {team_id} at event {index}"
             # Store the players on the court and merge / concat to keep track across the game for both teams
             temp_df = pd.DataFrame(

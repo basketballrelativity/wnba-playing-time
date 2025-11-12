@@ -28,7 +28,7 @@ def get_rosters(home_team_id: int, visitor_team_id: int, box_score_df: pd.DataFr
     return list(home_roster['player_id']), list(visitor_roster['player_id'])
 
 
-def main(game_id: int) -> pd.DataFrame:
+def derive_on_court_data(game_id: int) -> pd.DataFrame:
     """
     Main function to process the game data and return the players on the court.
     
